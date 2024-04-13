@@ -16,7 +16,7 @@ Indicators: Moving averages (SMA, EMA), Relative Strength Index (RSI), Moving Av
 
 Data Collection: Utilize the yfinance library to fetch historical stock data from Yahoo Finance.
 
-Indicator Calculation: Implement algorithms to calculate various financial indicators, including moving averages, RSI, MACD, and cumulative returns.
+Indicator Calculation: Implement algorithms to calculate various financial indicators, including Volatility Analysis with Moving Averages, RSI, MACD, Daily, Annual and Cumulative returns.
 
 Visualization: Visualize financial data and indicators using interactive Plotly charts for better analysis and interpretation.
 
