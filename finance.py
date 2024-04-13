@@ -14,8 +14,7 @@ import datetime as dt  # For defining dates
 import plotly.express as px
 import plotly.io as pio
 pio.renderers.default = "vscode"
-
-
+pio.renderers
 init_notebook_mode(connected=True)
 
 
