@@ -13,9 +13,25 @@ import datetime as dt  # For defining dates
 # Data Visualization using plotly
 import plotly.express as px
 import plotly.io as pio
-pio.renderers.default = "vscode"
-pio.renderers
+# pio.renderers.default = "vscode"
+pio.renderers.default = "svg"
 init_notebook_mode(connected=True)
+
+# function to display OHLC chart
+def ohlc_graph(data):
+
+    try:
+
+        # candle stick chart 
+        candlestick = go.Candlestick(x=data['Date'],
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='OHLC')
+        return candlestick
+    except Exception as e:
+        return e
 
 
 # Function that gets a dataframe by providing a ticker and starting date
@@ -201,12 +217,7 @@ def plot_ohlc_ma(dataframe, feature_name, name, linecolor):
     """
     try:
         # Create OHLC trace
-        ohlc_trace = go.Ohlc(x=dataframe['Date'],
-                             open=dataframe['Open'],
-                             high=dataframe['High'],
-                             low=dataframe['Low'],
-                             close=dataframe['Close'],
-                             name='OHLC')
+        ohlc_trace = ohlc_graph(dataframe=dataframe)
 
         # Create moving average trace
         ma_trace = go.Scatter(x=dataframe['Date'],
@@ -250,13 +261,8 @@ def ohlc_ma_chart(dataframe, ma_feature1, ma_feature2, color1, color2, name1, na
     """
     try:
         # Create Candlestick trace
-        candlestick = go.Candlestick(x=dataframe['Date'],
-                                     open=dataframe['Open'],
-                                     high=dataframe['High'],
-                                     low=dataframe['Low'],
-                                     close=dataframe['Close'],
-                                     name='OHLC')
-        
+        candlestick = ohlc_graph(data=dataframe)
+
         # Create Moving Average traces
         ma1_trace = go.Scatter(
             x=dataframe['Date'], y=dataframe[ma_feature1], mode='lines', name=name1, line=dict(color=color1))
@@ -267,7 +273,8 @@ def ohlc_ma_chart(dataframe, ma_feature1, ma_feature2, color1, color2, name1, na
         fig = go.Figure(data=[candlestick, ma1_trace, ma2_trace])
 
         # Update layout to hide range slider on x-axis
-        fig.update_layout(xaxis_rangeslider_visible=False,yaxis=dict(title='Close'))
+        fig.update_layout(xaxis_rangeslider_visible=False,
+                          yaxis=dict(title='Close'))
 
         # Show plot
         fig.show()
@@ -307,7 +314,7 @@ def macd(dataframe, fast, slow, timeframe, feature):
         # Calculate signal line
         dataframe['signal'] = dataframe['macd'].ewm(
             span=timeframe, adjust=False).mean()
-        
+
         # calculate difference between macd and signal
         dataframe['Histogram'] = dataframe['macd'] - dataframe['signal']
 
@@ -322,14 +329,10 @@ def macd_chart(dataframe, fast, slow, timeframe, feature1, feature2, feature3):
     try:
         macd_df = macd(dataframe, fast, slow, timeframe, feature1)
         # OHLC chart
-        ohlc_fig = go.Figure(data=go.Ohlc(x=dataframe['Date'],
-                                          open=dataframe['Open'],
-                                          high=dataframe['High'],
-                                          low=dataframe['Low'],
-                                          close=dataframe['Close']))
+        ohlc_fig = go.Figure(ohlc_graph(data=dataframe))
 
         ohlc_fig.update_layout(
-            title='OHLC Chart', xaxis_rangeslider_visible=False,yaxis=dict(title=feature1))
+            title='OHLC Chart', xaxis_rangeslider_visible=False, yaxis=dict(title=feature1))
 
         # MACD chart
         macd_fig = go.Figure()
@@ -403,12 +406,7 @@ def rsi_chart(dataframe, timeframe, upper, lower, feature_name):
     try:
         rsi_df = rsi_index(dataframe, timeframe, upper, lower, feature_name)
         # Create OHLC trace
-        ohlc_trace = go.Ohlc(x=rsi_df['Date'],
-                             open=rsi_df['Open'],
-                             high=rsi_df['High'],
-                             low=rsi_df['Low'],
-                             close=rsi_df['Close'],
-                             name='OHLC')
+        ohlc_trace = ohlc_graph(data=dataframe)
 
         # Create OHLC chart
         ohlc_fig = go.Figure(ohlc_trace)
