@@ -21,7 +21,6 @@ init_notebook_mode(connected=True)
 def ohlc_graph(data):
 
     try:
-
         # candle stick chart 
         candlestick = go.Candlestick(x=data['Date'],
                                      open=data['Open'],
@@ -33,22 +32,7 @@ def ohlc_graph(data):
     except Exception as e:
         return e
 
-
-# Function that gets a dataframe by providing a ticker and starting date
-def read_dataframe(ticker, syear, smonth, sday, eyear, emonth, eday):
-
-    # Defines the time periods to use
-    try:
-        start = dt.datetime(syear, smonth, sday)
-        end = dt.datetime(eyear, emonth, eday)
-
-        # return the dataframe
-        return yf.download(ticker + ".NS", start, end).reset_index()
-    except Exception as e:
-        return e
-
-
-def daily_return(dataframe, timeframe, feature1, feature2):
+def daily_return(dataframe=None, timeframe=None, feature=None):
     """
     Calculate the daily return of a feature based on a specified timeframe.
 
@@ -67,14 +51,13 @@ def daily_return(dataframe, timeframe, feature1, feature2):
     """
     try:
         # Calculate the percentage change of the specified feature over the specified timeframe
-        dataframe[feature1] = dataframe[feature2].pct_change(timeframe)
+        dataframe['daily_return'] = dataframe[feature].pct_change(timeframe)
         return dataframe
     except Exception as e:
         # If an error occurs during calculation, return the error message
         return e
 
-
-def cumalitive_return(df, feature1, feature2):
+def cumalitive_return(df,feature):
     """
 
     Cumulative return represents the aggregate growth of an investment over a specified period,
@@ -86,14 +69,14 @@ def cumalitive_return(df, feature1, feature2):
     """
     try:
         # Calculate cumulative returns using cumprod() function
-        df[feature1] = (1 + df[feature2]).cumprod()
+        df["cum_return"] = (1 + df[feature]).cumprod()
         return df
     except Exception as e:
         # If an error occurs during calculation, return the error message
         return e
 
-
-def annualized_return(df, start, end, feature):
+  
+def average_return(df=None,feature=None,days=None):
     """
     Annualized return measures the average rate of return per year, adjusted for compounding.
     It is calculated by taking the mean return over the period, then multiplying by the number
@@ -111,93 +94,418 @@ def annualized_return(df, start, end, feature):
     If an error occurs during calculation, return the error message.
     """
     try:
-        # Filter DataFrame based on the specified date range
-        filtered = df[(df['Date'] >= start) & (df['Date'] <= end)]
         # Calculate the mean return over the period and annualize it (assuming 252 trading days in a year)
-        return (filtered[feature].mean() * 252) * 100
+        return (((1 + df[feature].mean()) ** days)-1) * 100
     except Exception as e:
         # If an error occurs during calculation, return the error message
         return e
+    
+class DataSummary:
 
+    # This method summarizes the data by resampling it according to the provided frequency
+    @classmethod
+    def summarized_data(cls, dataframe=None, frequency=None, featurename=None):
+        try:
+            # Resample the given feature by the specified frequency (e.g., 'M' for monthly) 
+            # and calculate the mean for each resampled period.
+            return pd.DataFrame(dataframe[featurename].resample(frequency).mean())
+        except Exception as e:
+            # In case of an error, return the error message.
+            return e
 
-def volatility(dataframe, feature_name, bins):
+    # This method calculates whether the market was bullish or bearish based on the open-close price difference
+    @classmethod
+    def bullish_or_bearish_summary(cls, dataframe=None, frequency=None, featurename=None):
+        try:
+            # Calculate the difference between the closing price (feature name) and the opening price for each day
+            dataframe['open_close_difference'] = dataframe[featurename] - dataframe['Open']
+
+            # Resample the open-close difference by the specified frequency (e.g., 'M' for monthly)
+            # and calculate the average difference for each period.
+            return pd.DataFrame(dataframe['open_close_difference'].resample(frequency).mean())
+        except Exception as e:
+            # In case of an error, return the error message.
+            return e
+        
+class ReadData:
     """
-    Plot a histogram of the daily returns based on the specified feature.
+    A class to read stock and market data from Yahoo Finance using the yfinance library.
 
-    Volatility measures the dispersion of returns for a given security or market index.
-    It is often represented by the standard deviation of returns. A histogram of daily returns
-    provides insights into the distribution and variability of returns over the given period.
+    Attributes:
+    ----------
+    start : str
+        The start date for the data retrieval in 'YYYY-MM-DD' format.
+    end : str
+        The end date for the data retrieval in 'YYYY-MM-DD' format.
 
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the data.
-    feature_name (str): Name of the feature representing daily returns.
-
-    Returns:
-    None
-
-    If an error occurs during plotting, return the error message.
+    Methods:
+    --------
+    market_dataframe(ticker=None):
+        Downloads market index data (like NSE, BSE) for the given date range.
+        
+    read_dataframe(ticker=None):
+        Downloads stock data (e.g., TCS) for the given date range.
     """
-    try:
-        # Create a histogram plot of the daily returns
-        fig = px.histogram(dataframe, x=feature_name,
-                           title='Histogram of Daily Return', nbins=bins)
-        # Display the plot
-        fig.show()
-    except Exception as e:
-        # If an error occurs during plotting, return the error message
-        return e
+    
+    def __init__(self, start=None, end=None):
+        """
+        Initializes the ReadData class with the specified start and end dates.
+
+        Parameters:
+        -----------
+        start : str
+            The start date for downloading data (in 'YYYY-MM-DD' format).
+        end : str
+            The end date for downloading data (in 'YYYY-MM-DD' format).
+        """
+        self.start = start
+        self.end = end
+
+    def market_dataframe(self, ticker=None):
+        """
+        Downloads market index data from Yahoo Finance for the specified market index ticker.
+
+        Parameters:
+        -----------
+        ticker : str
+            The ticker symbol of the market index (e.g., 'NSE' or 'BSE').
+
+        Returns:
+        --------
+        DataFrame
+            A Pandas DataFrame with market index data for the specified date range.
+        """
+        try:
+            # Return the market index dataframe
+            return yf.download("^" + ticker, start=self.start, end=self.end).reset_index()
+        except Exception as e:
+            return e
+
+    def read_dataframe(self, ticker=None):
+        """
+        Downloads stock data from Yahoo Finance for the specified stock ticker.
+
+        Parameters:
+        -----------
+        ticker : str
+            The ticker symbol of the stock (e.g., 'TCS').
+
+        Returns:
+        --------
+        DataFrame
+            A Pandas DataFrame with stock data for the specified date range.
+        """
+        try:
+            # Return the stock dataframe
+            return yf.download(ticker + ".NS", start=self.start, end=self.end).reset_index()
+        except Exception as e:
+            return e
 
 
-def simple_moving_average(dataframe, feature, windowsize):
+class ReturnAnalysis:
     """
-    SMA is a widely used technical indicator that smooths out price data by calculating
-    the average of a specified number of past prices. It helps identify trends and reversals
-    by filtering out short-term fluctuations.
+    A class to perform various types of return analysis on financial data.
 
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the data.
-    feature (str): Name of the feature to calculate the SMA from.
-    windowsize (int): Size of the moving window for the SMA calculation.
+    Attributes:
+    -----------
+    feature : str
+        The feature/column name for which the return analysis is performed (e.g., 'Close', 'Adj Close').
 
-    Returns:
-    pandas.DataFrame: DataFrame with the SMA values appended under a new column.
+    Methods:
+    --------
+    daily_return_analysis(data=None, days=None):
+        Calculates daily returns for the specified number of days.
 
-    If an error occurs during calculation, return the error message.
+    cumalative_return_analysis(data=None, featurename=None):
+        Calculates cumulative returns for the specified feature.
+
+    average_return_analysis(data=None, days=None, featurename=None):
+        Calculates the average return over a given number of days for the specified feature.
     """
-    try:
-        # Calculate the Simple Moving Average
-        dataframe['SIMPLE_MA_' +
-                  str(windowsize)] = dataframe[feature].rolling(windowsize).mean()
-        return dataframe
-    except Exception as e:
-        # If an error occurs during calculation, return the error message
-        return e
+
+    def __init__(self, feature=None):
+        """
+        Initializes the ReturnAnalysis class with the specified feature (column name).
+
+        Parameters:
+        -----------
+        feature : str
+            The feature/column name for which return analysis is to be performed (e.g., 'Close', 'Adj Close').
+        """
+        self.feature = feature
+
+    def daily_return_analysis(self, data=None, days=None):
+        """
+        Calculates the daily return for the specified number of days.
+
+        Parameters:
+        -----------
+        data : DataFrame
+            The dataframe containing the financial data.
+        days : int
+            The number of days to use for the daily return calculation (e.g., 1 for daily, 30 for monthly).
+
+        Returns:
+        --------
+        DataFrame
+            A dataframe with daily return values based on the specified timeframe.
+        """
+        try:
+            return daily_return(dataframe=data, timeframe=days, feature=self.feature)
+        except Exception as e:
+            # Return the exception if an error occurs during calculation
+            return e
+
+    def cumalative_return_analysis(self, data=None, featurename=None):
+        """
+        Calculates the cumulative return for the specified feature over the given period.
+
+        Parameters:
+        -----------
+        data : DataFrame
+            The dataframe containing the financial data.
+        featurename : str
+            The feature/column name for which cumulative return is to be calculated.
+
+        Returns:
+        --------
+        DataFrame
+            A dataframe with the cumulative return values.
+        """
+        try:
+            return cumalitive_return(df=data, feature=featurename)
+        except Exception as e:
+            # Return the exception if an error occurs during calculation
+            return e
+
+    def average_return_analysis(self, data=None, days=None, featurename=None):
+        """
+        Calculates the average return over a specified number of days for the given feature.
+
+        Parameters:
+        -----------
+        data : DataFrame
+            The dataframe containing the financial data.
+        days : int
+            The number of days to calculate the average return.
+        featurename : str
+            The feature/column name for which the average return is to be calculated.
+
+        Returns:
+        --------
+        DataFrame
+            A dataframe with average return values.
+        """
+        try:
+            return average_return(df=data, feature=featurename, days=days)
+        except Exception as e:
+            # Return the exception if an error occurs during calculation
+            return e
 
 
-def exponential_moving_average(dataframe, feature, windowsize):
+
+class VolatilityAnalysis:
     """
-    EMA is a type of moving average that places greater weight on more recent data points,
-    making it more responsive to recent price changes. It helps identify trends and reversals
-    by providing a smoother representation of price movements compared to SMA.
+    A class to analyze volatility, Value at Risk (VaR), and beta of financial data.
 
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the data.
-    feature (str): Name of the feature to calculate the EMA from.
-    windowsize (int): Size of the moving window for the EMA calculation.
+    Attributes:
+    -----------
+    feature : str
+        The feature/column name for which the volatility analysis is performed (e.g., 'Close', 'Adj Close').
 
-    Returns:
-    pandas.DataFrame: DataFrame with the EMA values appended under a new column.
-
-    If an error occurs during calculation, return the error message.
+    Methods:
+    --------
+    volatility_std(df=None, days=None):
+        Calculates the standard deviation (volatility) based on the specified number of days (e.g., 21 for monthly, 252 for annual).
+    
+    volatility_VAR(df=None, confidence_level=None):
+        Calculates the Value at Risk (VaR) for the specified confidence level.
+    
+    beta_analysis(df=None, market_df=None):
+        Calculates the beta of the stock in comparison to the market data.
+    volatility(dataframe=None, bins=None):
+        Plotting histogram of the daily returns in order to visualize the volatility
+    
     """
-    try:
-        # Calculate the Exponential Moving Average
-        dataframe['EXPONENTIAL_MA_' + str(windowsize)] = dataframe[feature].ewm(
-            span=windowsize, adjust=False, min_periods=windowsize).mean()
-        return dataframe
-    except Exception as e:
-        # If an error occurs during calculation, return the error message
-        return e
+
+    def __init__(self, featurename=None):
+        """
+        Initializes the VolatilityAnalysis class with the specified feature (column name).
+
+        Parameters:
+        -----------
+        featurename : str
+            The feature/column name for which volatility analysis is to be performed (e.g., using daily_return for 'Close' or 'Adj Close').
+        """
+        self.feature = featurename
+
+    def volatility_std(self, df=None, days=None):
+        """
+        Calculates the annualized or monthly volatility (standard deviation) for the specified number of days.
+
+        Parameters:
+        -----------
+        df : DataFrame
+            The dataframe containing the financial data.
+        days : int
+            The number of days to annualize or convert the volatility (e.g., 252 for annual, 21 for monthly).
+
+        Returns:
+        --------
+        float
+            The volatility (standard deviation) as a percentage.
+        """
+        try:
+            # Calculate the standard deviation of the specified feature
+            daily_volatility = df[self.feature].std()
+            # Convert daily volatility to either annual or monthly volatility (252 for annual, 21 for monthly)
+            volatility = daily_volatility * np.sqrt(days)
+            return volatility * 100  # Return as a percentage
+        except Exception as e:
+            return e
+
+    def volatility_VAR(self, df=None, confidence_level=None):
+        """
+        Calculates the Value at Risk (VaR) based on the specified confidence level.
+
+        Parameters:
+        -----------
+        df : DataFrame
+            The dataframe containing the financial data.
+        confidence_level : float
+            The confidence level (e.g., 0.05 for 95% confidence interval).
+
+        Returns:
+        --------
+        float
+            The Value at Risk (VaR) as a percentage.
+        """
+        try:
+            # Sort the returns of the specified feature in ascending order
+            sorted_returns = df[self.feature].dropna().sort_values()
+            # Find the VaR at the specified percentile
+            VaR = np.percentile(sorted_returns, 100 * confidence_level)
+            return VaR * 100  # Return as a percentage
+        except Exception as e:
+            return e
+
+    def beta_analysis(self, df=None, market_df=None):
+        """
+        Calculates the beta of a stock with respect to the market data.
+
+        Beta measures the stock's volatility relative to the market. A beta greater than 1 means the stock is more volatile than the market, while a beta less than 1 means it is less volatile.
+
+        Parameters:
+        -----------
+        df : DataFrame
+            The dataframe containing the financial data for the stock.
+        market_df : DataFrame
+            The dataframe containing the financial data for the market (benchmark).
+
+        Returns:
+        --------
+        float
+            The beta of the stock relative to the market.
+        """
+        try:
+            # Calculate the covariance matrix between the stock and market returns
+            cov_matrix = np.cov(df[self.feature].dropna(), market_df[self.feature].dropna())
+            # Extract the covariance between stock and market
+            cov = cov_matrix[0, 1]
+            # Calculate the variance of the market returns
+            var = np.var(market_df[self.feature].dropna())
+            # Calculate beta (covariance divided by variance)
+            beta = cov / var
+            return beta
+        except Exception as e:
+            return e
+
+
+    def volatility(self,dataframe=None, bins=None):
+        """
+        Plot a histogram of the daily returns based on the specified feature.
+
+        Volatility measures the dispersion of returns for a given security or market index.
+        It is often represented by the standard deviation of returns. A histogram of daily returns
+        provides insights into the distribution and variability of returns over the given period.
+
+        Parameters:
+        dataframe (pandas.DataFrame): DataFrame containing the data.
+        feature_name (str): Name of the feature representing daily returns.
+
+        Returns:
+        None
+
+        If an error occurs during plotting, return the error message.
+        """
+        try:
+            # Create a histogram plot of the daily returns
+            fig = px.histogram(dataframe, x=self.feature,
+                            title='Histogram of Daily Return', nbins=bins)
+            # Display the plot
+            fig.show()
+        except Exception as e:
+            # If an error occurs during plotting, return the error message
+            return e
+
+
+class MovinAverageAnalysis:
+
+    def __init__(self,dataframe=None,featurename=None):
+        
+        self.dataframe = dataframe
+        self.feature = featurename
+
+    def simple_moving_average(self,windowsize=None):
+        """
+        SMA is a widely used technical indicator that smooths out price data by calculating
+        the average of a specified number of past prices. It helps identify trends and reversals
+        by filtering out short-term fluctuations.
+
+        Parameters:
+        dataframe (pandas.DataFrame): DataFrame containing the data.
+        feature (str): Name of the feature to calculate the SMA from.
+        windowsize (int): Size of the moving window for the SMA calculation.
+
+        Returns:
+        pandas.DataFrame: DataFrame with the SMA values appended under a new column.
+
+        If an error occurs during calculation, return the error message.
+        """
+        try:
+            # Calculate the Simple Moving Average
+            self.dataframe['SIMPLE_MA_' +
+                    str(windowsize)] = self.dataframe[self.feature].rolling(windowsize).mean()
+            return self.dataframe
+        except Exception as e:
+            # If an error occurs during calculation, return the error message
+            return e
+
+
+    def exponential_moving_average(self,windowsize=None):
+        """
+        EMA is a type of moving average that places greater weight on more recent data points,
+        making it more responsive to recent price changes. It helps identify trends and reversals
+        by providing a smoother representation of price movements compared to SMA.
+
+        Parameters:
+        dataframe (pandas.DataFrame): DataFrame containing the data.
+        feature (str): Name of the feature to calculate the EMA from.
+        windowsize (int): Size of the moving window for the EMA calculation.
+
+        Returns:
+        pandas.DataFrame: DataFrame with the EMA values appended under a new column.
+
+        If an error occurs during calculation, return the error message.
+        """
+        try:
+            # Calculate the Exponential Moving Average
+            self.dataframe['EXPONENTIAL_MA_' + str(windowsize)] = self.dataframe[self.feature].ewm(
+                span=windowsize, adjust=False, min_periods=windowsize).mean()
+            return self.dataframe
+        except Exception as e:
+            # If an error occurs during calculation, return the error message
+            return e
 
 
 def plot_ohlc_ma(dataframe, feature_name, name, linecolor):
@@ -217,7 +525,7 @@ def plot_ohlc_ma(dataframe, feature_name, name, linecolor):
     """
     try:
         # Create OHLC trace
-        ohlc_trace = ohlc_graph(dataframe=dataframe)
+        ohlc_trace = ohlc_graph(data=dataframe)
 
         # Create moving average trace
         ma_trace = go.Scatter(x=dataframe['Date'],
@@ -230,205 +538,13 @@ def plot_ohlc_ma(dataframe, feature_name, name, linecolor):
         fig = go.Figure([ohlc_trace, ma_trace])
 
         # Update layout to hide range slider on x-axis
-        fig.update_layout(xaxis_rangeslider_visible=False)
+        fig.update_layout(title='Simple Moving Average',xaxis_rangeslider_visible=False, xaxis=dict(title='Date'),
+                          yaxis=dict(title=f'{feature_name}'))
 
         # Show the plot
         fig.show()
     except Exception as e:
         # If an error occurs during plotting, return the error message
-        return e
-
-
-def ohlc_ma_chart(dataframe, ma_feature1, ma_feature2, color1, color2, name1, name2):
-    """
-    Comparing pairs of Moving Averages against the price movement of the stock.
-
-    This function creates a Plotly figure containing a candlestick chart representing OHLC data
-    and two line plots representing moving averages of different features.
-
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the OHLC data and the features for MA calculation.
-    ma_feature1 (str): Name of the feature representing the first moving average.
-    ma_feature2 (str): Name of the feature representing the second moving average.
-    color1 (str): Color of the line for the first moving average.
-    color2 (str): Color of the line for the second moving average.
-    name1 (str): Name of the first moving average trace.
-    name2 (str): Name of the second moving average trace.
-
-
-
-    If an error occurs during plotting, return the error message.
-    """
-    try:
-        # Create Candlestick trace
-        candlestick = ohlc_graph(data=dataframe)
-
-        # Create Moving Average traces
-        ma1_trace = go.Scatter(
-            x=dataframe['Date'], y=dataframe[ma_feature1], mode='lines', name=name1, line=dict(color=color1))
-        ma2_trace = go.Scatter(
-            x=dataframe['Date'], y=dataframe[ma_feature2], mode='lines', name=name2, line=dict(color=color2))
-
-        # Create figure
-        fig = go.Figure(data=[candlestick, ma1_trace, ma2_trace])
-
-        # Update layout to hide range slider on x-axis
-        fig.update_layout(xaxis_rangeslider_visible=False,
-                          yaxis=dict(title='Close'))
-
-        # Show plot
-        fig.show()
-    except Exception as e:
-        # If an error occurs during plotting, return the error message
-        return e
-
-
-def macd(dataframe, fast, slow, timeframe, feature):
-    """
-    Calculate the Moving Average Convergence Divergence (MACD) indicator for a given feature.
-
-    MACD is a trend-following momentum indicator that shows the relationship between two
-    exponential moving averages (EMAs) of a feature's price. It consists of three components:
-    MACD line, signal line, and histogram.
-
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the data.
-    fast (int): Number of periods for the fast EMA.
-    slow (int): Number of periods for the slow EMA.
-    timeframe (int): Number of periods for the signal line EMA.
-    feature (str): Name of the feature to calculate the MACD from.
-
-    Returns:
-    pandas.DataFrame: DataFrame with MACD and signal values appended under new columns.
-
-    If an error occurs during calculation, return the error message.
-    """
-    try:
-        # Calculate the fast and slow EMAs
-        fast_ema = dataframe[feature].ewm(span=fast, adjust=False).mean()
-        slow_ema = dataframe[feature].ewm(span=slow, adjust=False).mean()
-
-        # Calculate MACD line
-        dataframe['macd'] = fast_ema - slow_ema
-
-        # Calculate signal line
-        dataframe['signal'] = dataframe['macd'].ewm(
-            span=timeframe, adjust=False).mean()
-
-        # calculate difference between macd and signal
-        dataframe['Histogram'] = dataframe['macd'] - dataframe['signal']
-
-        return dataframe
-    except Exception as e:
-        # If an error occurs during calculation, return the error message
-        return e
-
-
-def macd_chart(dataframe, fast, slow, timeframe, feature1, feature2, feature3):
-
-    try:
-        macd_df = macd(dataframe, fast, slow, timeframe, feature1)
-        # OHLC chart
-        ohlc_fig = go.Figure(ohlc_graph(data=dataframe))
-
-        ohlc_fig.update_layout(
-            title='OHLC Chart', xaxis_rangeslider_visible=False, yaxis=dict(title=feature1))
-
-        # MACD chart
-        macd_fig = go.Figure()
-        macd_fig.add_trace(go.Scatter(
-            x=macd_df['Date'], y=macd_df[feature2], mode='lines', name='MACD'))
-        macd_fig.add_trace(go.Scatter(
-            x=macd_df['Date'], y=macd_df[feature3], mode='lines', name='Signal'))
-        macd_fig.add_trace(
-            go.Bar(x=macd_df['Date'], y=macd_df['Histogram'], name='MACD DIFF'))
-
-        macd_fig.update_layout(title='MACD Chart')
-
-        # Show OHLC and MACD charts
-        ohlc_fig.show()
-        macd_fig.show()
-    except Exception as e:
-        return e
-
-
-def rsi_index(dataframe, timeframe, upper, lower, feature_name):
-    """
-
-    RSI is a momentum oscillator that measures the speed and change of price movements.
-    It oscillates between 0 and 100 and is typically used to identify overbought or oversold conditions.
-
-    Parameters:
-    dataframe (pandas.DataFrame): DataFrame containing the data.
-    timeframe (int): Number of periods to compute the RSI over.
-    upper (int): Upper limit for RSI level classification.
-    lower (int): Lower limit for RSI level classification.
-    feature_name (str): Name of the feature to calculate the RSI from.
-
-    Returns:
-    None
-
-    If an error occurs during calculation, return the error message.
-    """
-    try:
-        # Calculate price change
-        dataframe['Price Change'] = dataframe[feature_name].diff()
-        # Calculate positive and negative price changes
-        dataframe['Positive Change'] = dataframe['Price Change'].apply(
-            lambda x: x if x > 0 else 0)
-        dataframe['Negative Change'] = dataframe['Price Change'].apply(
-            lambda x: abs(x) if x < 0 else 0)
-
-        # Calculate average gain and average loss over a specified timeframe
-        dataframe['Average Gain'] = dataframe['Positive Change'].rolling(
-            window=timeframe).mean()
-        dataframe['Average Loss'] = dataframe['Negative Change'].rolling(
-            window=timeframe).mean()
-
-        # Calculate Relative Strength (RS)
-        dataframe['RS'] = dataframe['Average Gain'] / dataframe['Average Loss']
-
-        # Calculate Relative Strength Index (RSI)
-        dataframe['RSI'] = 100 - (100 / (1 + dataframe['RS']))
-
-        # Classify RSI levels based on upper and lower limits
-        dataframe['RSI Level'] = 'Neutral'
-        dataframe.loc[dataframe['RSI'] > upper, 'RSI Level'] = 'Overbought'
-        dataframe.loc[dataframe['RSI'] < lower, 'RSI Level'] = 'Oversold'
-        return dataframe
-
-    except Exception as e:
-        return e
-
-
-def rsi_chart(dataframe, timeframe, upper, lower, feature_name):
-
-    try:
-        rsi_df = rsi_index(dataframe, timeframe, upper, lower, feature_name)
-        # Create OHLC trace
-        ohlc_trace = ohlc_graph(data=dataframe)
-
-        # Create OHLC chart
-        ohlc_fig = go.Figure(ohlc_trace)
-        ohlc_fig.update_layout(
-            title='OHLC Chart', xaxis_rangeslider_visible=False)
-
-        # Show OHLC chart
-        ohlc_fig.show()
-
-        # Create RSI trace
-        rsi_trace = px.line(data_frame=dataframe, x='Date',
-                            y='RSI', labels='RSI')
-        rsi_trace.add_hline(y=upper, opacity=0.5)
-        rsi_trace.add_hline(y=lower, opacity=0.5)
-
-        # Create RSI chart
-        rsi_fig = go.Figure(rsi_trace)
-        rsi_fig.update_layout(title='RSI Chart')
-
-        # Show RSI chart
-        rsi_fig.show()
-    except Exception as e:
         return e
 
 
@@ -450,3 +566,63 @@ def simple_line_chart(dataframe, feature, color, name):
         fig.show()
     except Exception as e:
         return e
+
+def multiple_line_chart(dataframe,feature1,feature2,name1,name2):
+
+    try:
+        # Create the figure
+        fig = go.Figure()
+
+        # Add first line chart
+        fig.add_trace(go.Scatter(x=dataframe['Date'], y=dataframe[feature1], mode='lines', name=name1))
+
+        # Add second line chart
+        fig.add_trace(go.Scatter(x=dataframe['Date'], y=dataframe[feature2], mode='lines', name=name2))
+
+        # Update layout
+        fig.update_layout(
+            title=f'{feature1} vs {feature2}',
+            xaxis_title='Date',
+            yaxis_title=f'{feature1} vs {feature2}'
+        )
+
+        # Show the figure
+        fig.show()
+    except Exception as e:
+        return e
+    
+def plot_conditional_bar_chart(data, y_col):
+    """
+    Plots a bar chart using Plotly where positive values are colored blue and negative values are colored red.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame containing the data to plot. The index will be used for the x-axis.
+    y_col (str): The column name to use for the y-axis (values).
+    
+    Returns:
+    plotly.graph_objects.Figure: A Plotly figure with the bar plot.
+    """
+    
+    # Create a Plotly figure
+    fig = go.Figure()
+
+    # Add bars with conditional color
+    for i in range(len(data)):
+        fig.add_trace(go.Bar(
+            x=[data.index[i]],  # Use the index for x-axis values
+            y=[data[y_col][i]],  # Use the y_col values for y-axis
+            marker_color='blue' if data[y_col][i] > 0 else 'red'  # Color based on value
+        ))
+
+    # Update layout
+    fig.update_layout(
+        title="Bar Plot with Conditional Coloring",
+        xaxis_title='Date',  # x-axis label
+        yaxis_title=y_col,  # y-axis label
+        showlegend=False
+    )
+
+    # Show the plot
+    return fig
+
+ 
